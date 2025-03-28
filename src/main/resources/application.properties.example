@@ -1,0 +1,10 @@
+spring.application.name=ExpenseTracker
+spring.datasource.url=jdbc:postgresql://localhost:5433/your_expense_tracker
+spring.datasource.username=your_username
+spring.datasource.password=your_password
+spring.devtools.restart.enabled=false
+spring.jpa.hibernate.ddl-auto=update
+app.jwt.secret=SECRET_JWT
+app.jwt.expiration=3600000
+telegram.bot.username=your_bot_name
+telegram.bot.token=YOUR_BOT_TOKEN
