@@ -7,45 +7,57 @@
     <style>
         body {
             font-family: sans-serif;
-            max-width: 600px;
+            max-width: 700px;
             margin: 30px auto;
         }
-        input {
+        input, button {
             width: 100%;
             padding: 10px;
             font-size: 14px;
-            margin-bottom: 10px;
-        }
-        button {
-            padding: 10px;
-            font-size: 16px;
-            width: 100%;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
         }
         canvas {
             max-width: 100%;
+            margin-top: 20px;
+        }
+        h2 {
+            margin-top: 40px;
         }
     </style>
 </head>
 <body>
-<h2>💸 Аналитика расходов по категориям</h2>
 
-<input type="text" id="jwt" placeholder="Вставь JWT токен" />
-<button onclick="loadChart()">Загрузить данные</button>
+<h1>Expense Tracker Analytics</h1>
 
+<input type="text" id="jwt" placeholder="Paste your JWT token here" />
+<button onclick="loadAnalytics()">Load Analytics</button>
+
+<h2>Monthly Total</h2>
+<p id="monthlyTotal">Click the button to load data</p>
+
+<h2>Expenses by Category</h2>
 <canvas id="categoryChart"></canvas>
 
 <script>
-    async function fetchData(token) {
-        const res = await fetch('http://localhost:8080/api/expenses/analytics/category', {
-            headers: {
-                'Authorization': 'Bearer ' + token
-            }
+    async function fetchMonthly(token) {
+        const res = await fetch('http://localhost:8080/api/expenses/analytics/period?period=month', {
+            headers: { 'Authorization': 'Bearer ' + token }
         });
 
         if (!res.ok) {
-            alert('Ошибка: ' + res.status);
-            throw new Error('Не удалось загрузить данные');
+            throw new Error('Monthly analytics fetch failed: ' + res.status);
+        }
+
+        return await res.text();
+    }
+
+    async function fetchCategory(token) {
+        const res = await fetch('http://localhost:8080/api/expenses/analytics/category', {
+            headers: { 'Authorization': 'Bearer ' + token }
+        });
+
+        if (!res.ok) {
+            throw new Error('Category analytics fetch failed: ' + res.status);
         }
 
         return await res.json();
@@ -53,18 +65,18 @@
 
     function renderChart(data) {
         const ctx = document.getElementById('categoryChart').getContext('2d');
-        const existingChart = Chart.getChart(ctx);
-        if (existingChart) existingChart.destroy();
+        const existing = Chart.getChart(ctx);
+        if (existing) existing.destroy();
 
         new Chart(ctx, {
             type: 'bar',
             data: {
                 labels: Object.keys(data),
                 datasets: [{
-                    label: 'Сумма расходов (₽)',
+                    label: 'Amount by Category (₽)',
                     data: Object.values(data),
-                    borderWidth: 1,
-                    backgroundColor: 'rgba(54, 162, 235, 0.6)'
+                    backgroundColor: 'rgba(75, 192, 192, 0.5)',
+                    borderWidth: 1
                 }]
             },
             options: {
@@ -76,20 +88,27 @@
         });
     }
 
-    async function loadChart() {
+    async function loadAnalytics() {
         const token = document.getElementById('jwt').value.trim();
         if (!token) {
-            alert('Введите JWT токен');
+            alert('Please enter JWT token');
             return;
         }
 
         try {
-            const data = await fetchData(token);
-            renderChart(data);
+            const [monthlyTotal, categoryData] = await Promise.all([
+                fetchMonthly(token),
+                fetchCategory(token)
+            ]);
+
+            document.getElementById('monthlyTotal').innerText = `${monthlyTotal} ₽`;
+            renderChart(categoryData);
         } catch (error) {
             console.error(error);
+            alert(error.message);
         }
     }
 </script>
+
 </body>
 </html>

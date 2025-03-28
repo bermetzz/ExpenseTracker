@@ -1,4 +1,4 @@
-package com.example.expensetracker.telegram;
+package com.example.expensetracker.bot;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

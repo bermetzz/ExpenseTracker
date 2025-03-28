@@ -1,49 +1,84 @@
-package com.example.expensetracker.telegram;
+package com.example.expensetracker.bot;
 
-import com.example.expensetracker.service.ExpenseService;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.example.expensetracker.service.ExpenseApiService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
-import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
+import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 @Component
 public class ExpenseBot extends TelegramLongPollingBot {
 
     @Value("${telegram.bot.username}")
-    private String botUsername;
+    private String username;
 
     @Value("${telegram.bot.token}")
-    private String botToken;
+    private String token;
 
-    @Autowired
-    private ExpenseService expenseService;
+    private final UserSessionService sessionService;
+    private final ExpenseApiService apiService;
+
+    public ExpenseBot(UserSessionService sessionService, ExpenseApiService apiService) {
+        this.sessionService = sessionService;
+        this.apiService = apiService;
+    }
 
     @Override
     public void onUpdateReceived(Update update) {
-        if (update.hasMessage()) {
-            Message message = update.getMessage();
-            String chatId = message.getChatId().toString();
-            String text = message.getText();
+        if (!update.hasMessage() || !update.getMessage().hasText()) return;
 
-            switch (text) {
-                case "/start" -> sendMsg(chatId, "Привет! Введи свой JWT токен.");
-                case "/month" -> {
-                    sendMsg(chatId, "За этот месяц: 450₽");
+        var message = update.getMessage();
+        var chatId = message.getChatId();
+        var text = message.getText();
+
+        if (text.startsWith("jwt ")) {
+            var jwt = text.substring(4).trim();
+            sessionService.saveToken(chatId, jwt);
+            send(chatId, "✅ JWT is saved.");
+            return;
+        }
+
+        switch (text) {
+            case "/start" -> send(chatId, """
+                    👋 Hello! This is the ExpenseTracker bot.
+                    Enter the command:
+                    `jwt <your token>` — to log in
+                    `/month` — monthly expenses
+                    `/category` — by category
+                    """);
+
+            case "/month" -> {
+                if (!sessionService.hasToken(chatId)) {
+                    send(chatId, "⚠ First send your JWT: `jwt <token>`");
+                } else {
+                    var jwt = sessionService.getToken(chatId);
+                    var result = apiService.getMonthExpense(jwt);
+                    send(chatId, "📆 Expenses per month: " + result);
                 }
-                case "/category" -> {
-                    sendMsg(chatId, "Еда: 300₽\nОдежда: 150₽");
-                }
-                default -> sendMsg(chatId, "Неизвестная команда.");
             }
+
+            case "/category" -> {
+                if (!sessionService.hasToken(chatId)) {
+                    send(chatId, "⚠ First send your JWT: `jwt <token>`");
+                } else {
+                    var jwt = sessionService.getToken(chatId);
+                    var result = apiService.getCategoryStats(jwt);
+                    send(chatId, "📊 By category:\n" + result);
+                }
+            }
+
+            default -> send(chatId, "Unknown command. Enter /start");
         }
     }
 
-    private void sendMsg(String chatId, String text) {
-        SendMessage msg = new SendMessage(chatId, text);
+    private void send(Long chatId, String text) {
+        var msg = SendMessage.builder()
+                .chatId(chatId.toString())
+                .text(text)
+                .parseMode("Markdown")
+                .build();
         try {
             execute(msg);
         } catch (TelegramApiException e) {
@@ -53,11 +88,11 @@ public class ExpenseBot extends TelegramLongPollingBot {
 
     @Override
     public String getBotUsername() {
-        return botUsername;
+        return username;
     }
 
     @Override
     public String getBotToken() {
-        return botToken;
+        return token;
     }
 }
