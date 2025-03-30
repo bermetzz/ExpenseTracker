@@ -14,17 +14,22 @@ Expense Tracker is an expense tracking app with support for JWT authentication, 
 1. Clone the repository
 ```bash
 git clone https://github.com/username/ExpenseTracker.git  
-cd ExpenseTracker  
+cd ExpenseTracker
+```
 2. Configure application.properties file:
-  spring.datasource.url=jdbc:postgresql://localhost:5432/expense_tracker
-  spring.datasource.username=YOUR_USERNAME
-  spring.datasource.password=YOUR_PASSWORD
-  app.jwt.secret=YOUR_SECRET_KEY
-  app.jwt.expiration=3600000
-  telegram.bot.token=YOUR_BOT_TOKEN
-  telegram.bot.username=YOUR_BOT_USERNAME
+```bash
+spring.datasource.url=jdbc:postgresql://localhost:5432/expense_tracker
+spring.datasource.username=YOUR_USERNAME
+spring.datasource.password=YOUR_PASSWORD
+app.jwt.secret=YOUR_SECRET_KEY
+app.jwt.expiration=3600000
+telegram.bot.token=YOUR_BOT_TOKEN
+telegram.bot.username=YOUR_BOT_USERNAME
+```
 3. Run the application
-  mvn spring-boot:run
+```bash
+mvn spring-boot:run
+```
 
 ## TODO
 
