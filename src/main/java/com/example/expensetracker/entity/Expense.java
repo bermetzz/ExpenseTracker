@@ -16,7 +16,6 @@ public class Expense {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
     private String description;
     private BigDecimal amount;
     private LocalDate date;
@@ -26,4 +25,8 @@ public class Expense {
     @ManyToOne
     @JoinColumn(name = "category_id")
     private Category category;
+    @Column(nullable = false)
+    @Enumerated(EnumType.STRING)
+    private Currency currency;
+
 }

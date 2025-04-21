@@ -2,6 +2,8 @@ package com.example.expensetracker.controller;
 
 import com.example.expensetracker.dto.ExpenseRequest;
 import com.example.expensetracker.dto.ExpenseResponse;
+import com.example.expensetracker.dto.TotalResponse;
+import com.example.expensetracker.entity.Currency;
 import com.example.expensetracker.service.ExpenseService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -49,8 +51,9 @@ public class ExpenseController {
     }
 
     @GetMapping("/analytics/period")
-    public BigDecimal totalByPeriod(@RequestParam String period,
-                                    @AuthenticationPrincipal UserDetails userDetails) {
-        return expenseService.getTotalForPeriod(userDetails.getUsername(), period);
+    public TotalResponse totalByPeriod(@RequestParam String period,
+                                       @AuthenticationPrincipal UserDetails userDetails) {
+        String email = userDetails.getUsername();
+        return expenseService.getTotalForPeriod(email, period);
     }
 }

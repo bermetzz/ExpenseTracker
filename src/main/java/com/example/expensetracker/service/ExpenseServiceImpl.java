@@ -2,7 +2,9 @@ package com.example.expensetracker.service;
 
 import com.example.expensetracker.dto.ExpenseRequest;
 import com.example.expensetracker.dto.ExpenseResponse;
+import com.example.expensetracker.dto.TotalResponse;
 import com.example.expensetracker.entity.Category;
+import com.example.expensetracker.entity.Currency;
 import com.example.expensetracker.entity.Expense;
 import com.example.expensetracker.entity.User;
 import com.example.expensetracker.repository.CategoryRepository;
@@ -12,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.math.MathContext;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -38,6 +41,7 @@ public class ExpenseServiceImpl implements ExpenseService {
                 .date(request.date())
                 .user(user)
                 .category(category)
+                .currency(request.currency() != null ? request.currency() : Currency.KGS)
                 .build();
         Expense saved = expenseRepository.save(expense);
 
@@ -95,28 +99,57 @@ public class ExpenseServiceImpl implements ExpenseService {
         User user = userRepository.findByEmail(userEmail).orElseThrow();
         return expenseRepository.findByUser(user).stream()
                 .collect(Collectors.groupingBy(
-                        e -> e.getCategory().getName(),
+                        e -> e.getCategory().getName() + " (" + e.getCurrency().name() + ")",
                         Collectors.reducing(BigDecimal.ZERO, Expense::getAmount, BigDecimal::add)
                 ));
+
     }
 
     @Override
-    public BigDecimal getTotalForPeriod(String userEmail, String period) {
+    public TotalResponse getTotalForPeriod(String userEmail, String period) {
         User user = userRepository.findByEmail(userEmail).orElseThrow();
+        Currency userCurrency = getUserCurrency(userEmail);
         LocalDate now = LocalDate.now();
         LocalDate start;
 
-        return switch (period.toLowerCase()) {
-            case "day" -> sumByDateRange(user, now, now);
-            case "week" -> sumByDateRange(user, now.minusDays(6), now);
-            case "month" -> sumByDateRange(user, now.withDayOfMonth(1), now);
+        switch (period.toLowerCase()) {
+            case "day" -> start = now;
+            case "week" -> start = now.minusDays(6);
+            case "month" -> start = now.withDayOfMonth(1);
             default -> throw new IllegalArgumentException("Invalid period: " + period);
-        };
+        }
+
+        BigDecimal totalAmount = sumExpensesInUserCurrency(user, start, now, userCurrency);
+        Map<Currency, BigDecimal> amountMap = Map.of(userCurrency, totalAmount);
+        return new TotalResponse(amountMap, userCurrency);
     }
 
     private BigDecimal sumByDateRange(User user, LocalDate from, LocalDate to) {
         return expenseRepository.findByUserAndDateBetween(user, from, to).stream()
                 .map(Expense::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    @Override
+    public Currency getUserCurrency(String userEmail) {
+        return userRepository.findByEmail(userEmail)
+                .map(User::getCurrency)
+                .orElse(Currency.KGS);
+    }
+
+    private BigDecimal sumExpensesInUserCurrency(User user, LocalDate from, LocalDate to, Currency targetCurrency) {
+        Map<Currency, BigDecimal> exchangeRates = Map.of(
+                Currency.KGS, BigDecimal.valueOf(1),
+                Currency.EUR, BigDecimal.valueOf(95),
+                Currency.USD, BigDecimal.valueOf(87)
+        );
+
+        return expenseRepository.findByUserAndDateBetween(user, from, to).stream()
+                .map(expense -> {
+                    BigDecimal rate = exchangeRates.getOrDefault(expense.getCurrency(), BigDecimal.ONE)
+                            .divide(exchangeRates.getOrDefault(targetCurrency, BigDecimal.ONE).round(new MathContext(2)));
+                    return expense.getAmount().multiply(rate);
+                })
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 }

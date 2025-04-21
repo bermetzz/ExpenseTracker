@@ -39,6 +39,12 @@
 <canvas id="categoryChart"></canvas>
 
 <script>
+    const exchangeRates = {
+        KGS: 1,
+        USD: 87,
+        EUR: 95
+    };
+
     async function fetchMonthly(token) {
         const res = await fetch('http://localhost:8080/api/expenses/analytics/period?period=month', {
             headers: { 'Authorization': 'Bearer ' + token }
@@ -48,7 +54,7 @@
             throw new Error('Monthly analytics fetch failed: ' + res.status);
         }
 
-        return await res.text();
+        return await res.json();
     }
 
     async function fetchCategory(token) {
@@ -63,18 +69,39 @@
         return await res.json();
     }
 
+    function groupAndConvertToKGS(data) {
+        const grouped = {};
+
+        for (const [label, value] of Object.entries(data)) {
+            const [category, currencyPart] = label.split(' (');
+            const currency = currencyPart.replace(')', '');
+
+            const rate = exchangeRates[currency] || 1;
+            const amountInKgs = parseFloat(value) * rate;
+
+            if (!grouped[category]) {
+                grouped[category] = 0;
+            }
+            grouped[category] += amountInKgs;
+        }
+
+        return grouped;
+    }
+
     function renderChart(data) {
         const ctx = document.getElementById('categoryChart').getContext('2d');
         const existing = Chart.getChart(ctx);
         if (existing) existing.destroy();
 
+        const groupedData = groupAndConvertToKGS(data);
+
         new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: Object.keys(data),
+                labels: Object.keys(groupedData),
                 datasets: [{
-                    label: 'Amount by Category (₽)',
-                    data: Object.values(data),
+                    label: 'Amount by Category (in KGS)',
+                    data: Object.values(groupedData),
                     backgroundColor: 'rgba(75, 192, 192, 0.5)',
                     borderWidth: 1
                 }]
@@ -101,7 +128,13 @@
                 fetchCategory(token)
             ]);
 
-            document.getElementById('monthlyTotal').innerText = `${monthlyTotal} ₽`;
+            const amountEntries = Object.entries(monthlyTotal.amount);
+            const amountText = amountEntries.map(
+                ([currency, value]) => `${value} ${currency}`
+            ).join(', ');
+
+            document.getElementById('monthlyTotal').innerText = amountText;
+
             renderChart(categoryData);
         } catch (error) {
             console.error(error);
